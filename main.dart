@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'models.dart';
 import 'checkout_page.dart';
 import 'review_page.dart';
@@ -29,7 +30,178 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: HomePage(),
+      home: const SignInPage(),
+    );
+  }
+}
+
+class SignInPage extends StatefulWidget {
+  const SignInPage({super.key});
+
+  @override
+  SignInPageState createState() => SignInPageState();
+}
+
+class SignInPageState extends State<SignInPage> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String? _errorMessage;
+
+  final _secureStorage = const FlutterSecureStorage();
+
+  Future<void> _signIn() async {
+    setState(() {
+      _errorMessage = null;
+    });
+    final username = _usernameController.text;
+    final password = _passwordController.text;
+
+    final storedPassword = await _secureStorage.read(key: username);
+    
+    if (mounted) {
+      if (storedPassword == password) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      } else {
+        setState(() {
+          _errorMessage = 'Invalid username or password';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Sign In'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            TextField(
+              controller: _usernameController,
+              decoration: const InputDecoration(labelText: 'Username'),
+            ),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _signIn,
+              child: const Text('Sign In'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => SignUpPage(secureStorage: _secureStorage)),
+                );
+              },
+              child: const Text('Don\'t have an account? Sign Up'),
+            ),
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SignUpPage extends StatefulWidget {
+  final FlutterSecureStorage secureStorage;
+
+  const SignUpPage({super.key, required this.secureStorage});
+
+  @override
+  SignUpPageState createState() => SignUpPageState();
+}
+
+class SignUpPageState extends State<SignUpPage> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String? _errorMessage;
+
+  Future<void> _signUp() async {
+    setState(() {
+      _errorMessage = null;
+    });
+    final username = _usernameController.text;
+    final password = _passwordController.text;
+
+    if (username.isNotEmpty && password.isNotEmpty) {
+      final storedPassword = await widget.secureStorage.read(key: username);
+      
+      // Check if widget is still mounted before updating state or navigating
+      if (mounted) {
+        if (storedPassword != null) {
+          setState(() {
+            _errorMessage = 'Username already exists';
+          });
+        } else {
+          await widget.secureStorage.write(key: username, value: password);
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        }
+      }
+    } else {
+      setState(() {
+        _errorMessage = 'Please fill in all fields';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Sign Up'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            TextField(
+              controller: _usernameController,
+              decoration: const InputDecoration(labelText: 'Username'),
+            ),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _signUp,
+              child: const Text('Sign Up'),
+            ),
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -270,14 +442,17 @@ class AddressPageState extends State<AddressPage> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                setState(() {
-                  _address = _addressController.text;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Address saved: $_address'),
-                  ),
-                );
+                final address = _addressController.text;
+                if (mounted) {
+                  setState(() {
+                    _address = address;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Address saved: $_address'),
+                    ),
+                  );
+                }
               },
               child: const Text('Save Address'),
             ),
@@ -287,3 +462,4 @@ class AddressPageState extends State<AddressPage> {
     );
   }
 }
+
